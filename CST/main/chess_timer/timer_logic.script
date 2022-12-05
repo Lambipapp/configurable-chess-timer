@@ -1,0 +1,108 @@
+go.property("gui_url", msg.url())
+
+
+local function create_player(self)
+	return {
+		moves = 0,
+		timer = self.timer_time
+	}
+end
+
+
+local function set_paused(self, paused)
+	self.paused = paused
+	msg.post(".", hash("set_paused"), {paused = paused})
+end
+
+local function setup(self)
+	self.players = {}
+
+	table.insert(self.players, create_player(self))
+	table.insert(self.players, create_player(self))
+
+	set_paused(self, true)
+	self.player_active = nil
+	self.over = false
+
+	
+end
+
+function init(self)
+	
+	self.timer_time = 300
+	self.increment_time = 0
+
+	setup(self)
+
+	msg.post(".", hash("set_values"), {timer_text = self.timer_time})
+end
+
+
+function update(self, dt)
+	if self.active_player then
+		if not self.paused then
+			
+			self.players[self.active_player].timer = self.players[self.active_player].timer - dt
+			local timer = self.players[self.active_player].timer 
+			if timer > 0 then
+				msg.post(".", hash("update_timer"), {player = self.active_player, time = timer})
+			else
+				msg.post(".", hash("game_over"), {player = self.active_player, time = timer})
+				set_paused(self, true)
+				self.over = true
+			end
+		else
+		end
+	end
+end
+
+local function timer_pressed(self, message)
+	if self.over then
+		msg.post(".", hash("reset"))
+	end
+	if message.player == 1 then
+		if self.active_player == 2 then
+		else
+			self.active_player = 2
+			self.players[self.active_player].moves = self.players[self.active_player].moves + 1
+			self.players[message.player].timer = self.players[message.player].timer + self.increment_time
+			msg.post(".", hash("update_timer"), {player = message.player, time = self.players[message.player].timer})
+			msg.post(".", hash("update_moves"), {player = message.player, moves = self.players[message.player].moves})
+		end
+		
+	else
+		if self.active_player == 1 then
+		else
+			self.active_player = 1
+			self.players[self.active_player].moves = self.players[self.active_player].moves + 1
+			self.players[message.player].timer = self.players[message.player].timer + self.increment_time
+			msg.post(".", hash("update_timer"), {player = message.player, time = self.players[message.player].timer})
+			msg.post(".", hash("update_moves"), {player = message.player, moves = self.players[message.player].moves})
+		end
+	end
+	set_paused(self, false)
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == hash("set_timer_value") then
+		self.timer_time = message.timer_time
+		
+	elseif message_id == hash("set_increment_value") then
+		self.increment_time = message.increment_time
+
+	elseif message_id == hash("timer_pressed") then
+		timer_pressed(self, message)
+
+	elseif message_id == hash("pause_play") then
+		if message.paused then
+			set_paused(self, message.paused)
+		else
+			set_paused(self, not self.paused)
+		end 
+		
+
+	elseif message_id == hash("reset") then
+		setup(self)
+		msg.post(".", hash("set_values"), {timer_text = self.timer_time})
+	end
+end

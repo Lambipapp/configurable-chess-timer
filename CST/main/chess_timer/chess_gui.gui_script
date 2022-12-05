@@ -1,0 +1,140 @@
+
+local function set_pause_play(self, paused)
+	gui.set_visible(self.play, paused)
+	gui.set_visible(self.pause, not paused)
+end
+
+
+function init(self)
+	msg.post(".", "acquire_input_focus")
+
+	self.views = {
+		game = 1,
+		settings = 2,
+		reset_dialog = 3
+	}
+	self.view = self.views.game
+	
+	self.inactive_timer_color = vmath.vector4(51/255, 51/255, 51/255, 1)
+	self.active_timer_color = vmath.vector4(20/255, 100/255, 20/255, 1)
+	self.default_timer_color = vmath.vector4(0.7, 0.7, 0.7, 1)
+	self.timer_out_color = vmath.vector4(1, 0.2, 0.2, 1)
+
+
+	self.pause_play = gui.get_node("pause_play")
+	self.pause = gui.get_node("pause")
+	self.play = gui.get_node("play")
+
+	self.reset = gui.get_node("reset")
+	
+
+	self.players_gui = {}
+	local bottom_player = {
+		timer = gui.get_node("bottom_timer_text"),
+		background = gui.get_node("bottom_timer"),
+		moves = gui.get_node("bottom_moves_text"),
+	}
+
+	local top_player = {
+		timer = gui.get_node("top_timer_text"),
+		background = gui.get_node("top_timer"),
+		moves = gui.get_node("top_moves_text"),
+	}
+
+	gui.set_color(bottom_player.background, self.default_timer_color)
+	gui.set_color(top_player.background, self.default_timer_color)
+
+	table.insert(self.players_gui, bottom_player)
+	table.insert(self.players_gui, top_player)
+end
+
+local function format_timer_text(time)
+	local minutes = math.floor(time / 60)
+	local seconds = math.floor(time - minutes * 60)
+	seconds = string.format("%02d", seconds)
+	
+	local time_text =  minutes .. ":" .. seconds
+	if minutes < 1 then
+		time_text = seconds
+	end
+	if time < 10 then
+		time_text = string.format("%.1f", time)
+	end
+	return time_text
+end
+
+local function update_timer_text(self, gui, time)
+	gui.set_text(gui, format_timer_text(time))
+end
+
+local function set_initial(self, values)
+	self.last_sender = nil
+	for k, v in ipairs(self.players_gui) do
+		gui.set_color(v.background, self.default_timer_color)
+		gui.set_text(v.timer, format_timer_text(values.timer_text))
+		gui.set_text(v.moves, 0)
+		
+	end
+end
+
+local function set_timer_colors(self, player)
+	if self.last_sender ~= player then
+		for k, v in ipairs(self.players_gui) do
+			if player == k then
+				gui.set_color(v.background, self.active_timer_color)
+			else
+				gui.set_color(v.background, self.inactive_timer_color)
+			end
+		end
+	end
+	self.last_sender = player
+end
+
+
+function on_message(self, message_id, message, sender)
+	if message_id == hash("change_player") then
+		
+	elseif message_id == hash("update_timer") then
+		gui.set_text(self.players_gui[message.player].timer, format_timer_text(message.time))
+		set_timer_colors(self, message.player)
+		
+	elseif message_id == hash("game_over") then
+		gui.set_color(self.players_gui[message.player].background, self.timer_out_color)
+
+	elseif message_id == hash("set_values") then
+		set_initial(self, message)
+
+	elseif message_id == hash("update_moves") then
+		gui.set_text(self.players_gui[message.player].moves, message.moves)
+
+	elseif message_id == hash("set_paused") then
+		set_pause_play(self, message.paused)
+		
+	end
+end 
+
+
+function on_input(self, action_id, action)
+	if action.pressed then
+		if self.view == self.views.game then
+			
+			if gui.pick_node(self.players_gui[1].background, action.x, action.y) then
+				msg.post(".", hash("timer_pressed"), {player = 1})
+
+			elseif gui.pick_node(self.players_gui[2].background, action.x, action.y) then
+				msg.post(".", hash("timer_pressed"), {player = 2})
+				
+			elseif gui.pick_node(self.pause_play, action.x, action.y) then
+				msg.post(".", hash("pause_play"), {paused = nil})
+
+			elseif gui.pick_node(self.reset, action.x, action.y) then
+				msg.post(".", hash("reset"))
+			end
+			
+		elseif self.view == self.views.settings then
+			
+		elseif self.view == self.views.reset_dialog then
+			
+		end
+	end
+end
