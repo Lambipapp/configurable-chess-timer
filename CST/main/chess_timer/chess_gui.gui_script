@@ -56,6 +56,7 @@ function init(self)
 	
 	self.inactive_timer_color = vmath.vector4(51/255, 51/255, 51/255, 1)
 	self.active_timer_color = vmath.vector4(20/255, 100/255, 20/255, 1)
+	self.paused_color = vmath.vector4(100/255, 100/255, 100/255, 1)
 	self.default_timer_color = vmath.vector4(0.7, 0.7, 0.7, 1)
 	self.timer_out_color = vmath.vector4(1, 0.2, 0.2, 1)
 
@@ -161,7 +162,7 @@ end
 
 
 function on_input(self, action_id, action)
-	if action.pressed then
+	if action_id == hash("touch_multi") and action.pressed then
 		if self.view == self.views.game then
 			if gui.pick_node(self.players_gui[1].background, action.x, action.y) then
 				msg.post(".", hash("timer_pressed"), {player = 1})
@@ -171,6 +172,8 @@ function on_input(self, action_id, action)
 				
 			elseif gui.pick_node(self.pause_play, action.x, action.y) then
 				msg.post(".", hash("pause_play"), {paused = nil})
+				gui.set_color(self.players_gui[1].background, self.paused_color)
+				gui.set_color(self.players_gui[2].background, self.paused_color)
 
 			elseif gui.pick_node(self.reset, action.x, action.y) then
 				msg.post(".", hash("reset"))
