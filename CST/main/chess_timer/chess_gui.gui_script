@@ -1,9 +1,20 @@
-
-local function set_pause_play(self, paused)
+local function set_pause_play(self, paused, active_player)
 	gui.set_visible(self.play, paused)
 	gui.set_visible(self.pause, not paused)
-end
+	if paused then
+		gui.set_color(self.players_gui[1].background, self.paused_color)
+		gui.set_color(self.players_gui[2].background, self.paused_color)
+	else
+		for k, v in ipairs(self.players_gui) do
+			if active_player == k then
+				gui.set_color(v.background, self.active_timer_color)
+			else
+				gui.set_color(v.background, self.inactive_timer_color)
+			end
+		end
+	end
 
+end
 
 local function change_view(self, new_view)
 	gui.set_enabled(self.settings_view, false)
@@ -18,7 +29,7 @@ local function format_time_settings_text(time)
 	local minutes = math.floor(time / 60)
 	local seconds = math.floor(time - minutes * 60)
 	seconds = string.format("%02d", seconds)
-	local time_text =  minutes .. ":" .. seconds
+	local time_text = minutes .. ":" .. seconds
 	return time_text
 end
 
@@ -27,7 +38,7 @@ local function format_timer_text(time)
 	local seconds = math.floor(time - minutes * 60)
 	seconds = string.format("%02d", seconds)
 
-	local time_text =  minutes .. ":" .. seconds
+	local time_text = minutes .. ":" .. seconds
 	if minutes < 1 then
 		time_text = seconds
 	end
@@ -37,9 +48,9 @@ local function format_timer_text(time)
 	return time_text
 end
 
-
 function init(self)
 	msg.post(".", "acquire_input_focus")
+	self.been_paused = true
 	self.views = {
 		game = 1,
 		settings = 2,
@@ -53,10 +64,10 @@ function init(self)
 		default_increment = 0,
 		default_time = 0
 	}
-	
-	self.inactive_timer_color = vmath.vector4(51/255, 51/255, 51/255, 1)
-	self.active_timer_color = vmath.vector4(20/255, 100/255, 20/255, 1)
-	self.paused_color = vmath.vector4(100/255, 100/255, 100/255, 1)
+
+	self.inactive_timer_color = vmath.vector4(51 / 255, 51 / 255, 51 / 255, 1)
+	self.active_timer_color = vmath.vector4(20 / 255, 100 / 255, 20 / 255, 1)
+	self.paused_color = vmath.vector4(100 / 255, 100 / 255, 100 / 255, 1)
 	self.default_timer_color = vmath.vector4(0.7, 0.7, 0.7, 1)
 	self.timer_out_color = vmath.vector4(1, 0.2, 0.2, 1)
 
@@ -72,7 +83,7 @@ function init(self)
 	self.save_settings = gui.get_node("apply_btn")
 	self.dismiss_settings = gui.get_node("abort_btn")
 	self.reset_settings = gui.get_node("reset_btn")
-	
+
 	self.left_timer_btn = gui.get_node("time_left")
 	self.rigth_timer_btn = gui.get_node("time_right")
 	self.time_text = gui.get_node("time_value")
@@ -80,7 +91,7 @@ function init(self)
 	self.rigth_incr_btn = gui.get_node("increment_right")
 	self.incr_text = gui.get_node("increment_time_value")
 
-	
+
 	self.players_gui = {}
 	local bottom_player = {
 		timer = gui.get_node("bottom_timer_text"),
@@ -101,24 +112,19 @@ function init(self)
 	table.insert(self.players_gui, top_player)
 end
 
-
-
-local function update_timer_text(self, gui, time)
-	gui.set_text(gui, format_timer_text(time, true))
-end
-
 local function set_initial(self, values)
 	self.last_sender = nil
 	for k, v in ipairs(self.players_gui) do
 		gui.set_color(v.background, self.default_timer_color)
 		gui.set_text(v.timer, format_timer_text(values.timer_text, true))
 		gui.set_text(v.moves, 0)
-		
+
 	end
 end
 
 local function set_timer_colors(self, player)
 	if self.last_sender ~= player then
+		self.been_paused = false
 		for k, v in ipairs(self.players_gui) do
 			if player == k then
 				gui.set_color(v.background, self.active_timer_color)
@@ -130,14 +136,11 @@ local function set_timer_colors(self, player)
 	self.last_sender = player
 end
 
-
 function on_message(self, message_id, message, sender)
-	if message_id == hash("change_player") then
-		
-	elseif message_id == hash("update_timer") then
+	if message_id == hash("update_timer") then
 		gui.set_text(self.players_gui[message.player].timer, format_timer_text(message.time))
 		set_timer_colors(self, message.player)
-		
+
 	elseif message_id == hash("game_over") then
 		gui.set_color(self.players_gui[message.player].background, self.timer_out_color)
 
@@ -148,7 +151,7 @@ function on_message(self, message_id, message, sender)
 		gui.set_text(self.players_gui[message.player].moves, message.moves)
 
 	elseif message_id == hash("set_paused") then
-		set_pause_play(self, message.paused)
+		set_pause_play(self, message.paused, message.active_player)
 
 	elseif message_id == hash("provide_settings") then
 		self.values.time = message.timer_time
@@ -156,38 +159,33 @@ function on_message(self, message_id, message, sender)
 		self.values.default_increment = message.default_increment
 		self.values.default_time = message.default_time
 		gui.set_text(self.incr_text, message.increment)
-		gui.set_text(self.time_text, format_time_settings_text( message.timer_time))
+		gui.set_text(self.time_text, format_time_settings_text(message.timer_time))
 	end
-end 
-
+end
 
 function on_input(self, action_id, action)
-	if action_id == hash("touch_multi") and action.pressed then
+	if action.pressed then
 		if self.view == self.views.game then
 			if gui.pick_node(self.players_gui[1].background, action.x, action.y) then
-				msg.post(".", hash("timer_pressed"), {player = 1})
+				msg.post(".", hash("timer_pressed"), { player = 1 })
 
 			elseif gui.pick_node(self.players_gui[2].background, action.x, action.y) then
-				msg.post(".", hash("timer_pressed"), {player = 2})
-				
+				msg.post(".", hash("timer_pressed"), { player = 2 })
+
 			elseif gui.pick_node(self.pause_play, action.x, action.y) then
-				msg.post(".", hash("pause_play"), {paused = nil})
-				gui.set_color(self.players_gui[1].background, self.paused_color)
-				gui.set_color(self.players_gui[2].background, self.paused_color)
+				msg.post(".", hash("pause_play"))
 
 			elseif gui.pick_node(self.reset, action.x, action.y) then
 				msg.post(".", hash("reset"))
-				
-			elseif gui.pick_node(self.settings_btn , action.x, action.y) then
+
+			elseif gui.pick_node(self.settings_btn, action.x, action.y) then
 				change_view(self, self.views.settings)
 			end
-			
-		elseif self.view == self.views.settings then
 
-			
+		elseif self.view == self.views.settings then
 			if gui.pick_node(self.save_settings, action.x, action.y) then
 				-- save
-				msg.post(".", hash("update_settings"), {time = self.values.time, increment = self.values.increment})
+				msg.post(".", hash("update_settings"), { time = self.values.time, increment = self.values.increment })
 				change_view(self, self.views.game)
 
 			elseif gui.pick_node(self.dismiss_settings, action.x, action.y) then
@@ -204,19 +202,19 @@ function on_input(self, action_id, action)
 					self.values.time = self.values.time - 30
 					gui.set_text(self.time_text, format_time_settings_text(self.values.time))
 				end
-				
+
 			elseif gui.pick_node(self.rigth_timer_btn, action.x, action.y) then
 				if self.values.time < 3600 then
 					self.values.time = self.values.time + 30
 					gui.set_text(self.time_text, format_time_settings_text(self.values.time))
 				end
-				
+
 			elseif gui.pick_node(self.left_incr_btn, action.x, action.y) then
 				if self.values.increment > 0 then
 					self.values.increment = self.values.increment - 1
 					gui.set_text(self.incr_text, self.values.increment)
 				end
-				
+
 			elseif gui.pick_node(self.rigth_incr_btn, action.x, action.y) then
 				if self.values.increment < 60 then
 					self.values.increment = self.values.increment + 1
@@ -225,7 +223,7 @@ function on_input(self, action_id, action)
 			end
 
 		elseif self.view == self.views.reset_dialog then
-			
+
 		end
 	end
 end

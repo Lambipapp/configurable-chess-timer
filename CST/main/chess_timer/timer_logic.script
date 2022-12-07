@@ -8,10 +8,9 @@ local function create_player(self)
 	}
 end
 
-
 local function set_paused(self, paused)
 	self.paused = paused
-	msg.post(".", hash("set_paused"), {paused = paused})
+	msg.post(".", hash("set_paused"), { paused = paused, active_player = self.active_player })
 end
 
 local function setup(self)
@@ -23,7 +22,7 @@ local function setup(self)
 	set_paused(self, true)
 	self.over = false
 	self.active_player = nil
-	
+
 end
 
 function init(self)
@@ -34,20 +33,19 @@ function init(self)
 
 	setup(self)
 
-	msg.post(".", hash("set_values"), {timer_text = self.timer_time})
+	msg.post(".", hash("set_values"), { timer_text = self.timer_time })
 end
-
 
 function update(self, dt)
 	if self.active_player then
 		if not self.paused then
-			
+
 			self.players[self.active_player].timer = self.players[self.active_player].timer - dt
-			local timer = self.players[self.active_player].timer 
+			local timer = self.players[self.active_player].timer
 			if timer > 0 then
-				msg.post(".", hash("update_timer"), {player = self.active_player, time = timer})
+				msg.post(".", hash("update_timer"), { player = self.active_player, time = timer })
 			else
-				msg.post(".", hash("game_over"), {player = self.active_player, time = timer})
+				msg.post(".", hash("game_over"), { player = self.active_player, time = timer })
 				set_paused(self, true)
 				self.over = true
 			end
@@ -61,8 +59,8 @@ local function manage_timers(self, last_player, first_action)
 	if not first_action then
 		self.players[last_player].timer = self.players[last_player].timer + self.increment_time
 	end
-	msg.post(".", hash("update_timer"), {player = last_player, time = self.players[last_player].timer})
-	msg.post(".", hash("update_moves"), {player = last_player, moves = self.players[last_player].moves})
+	msg.post(".", hash("update_timer"), { player = last_player, time = self.players[last_player].timer })
+	msg.post(".", hash("update_moves"), { player = last_player, moves = self.players[last_player].moves })
 end
 
 local function timer_pressed(self, message)
@@ -76,7 +74,7 @@ local function timer_pressed(self, message)
 			self.active_player = 2
 			manage_timers(self, message.player, first_action)
 		end
-		
+
 	else
 		if self.active_player == 1 then
 		else
@@ -90,7 +88,7 @@ end
 function on_message(self, message_id, message, sender)
 	if message_id == hash("set_timer_value") then
 		self.timer_time = message.timer_time
-		
+
 	elseif message_id == hash("set_increment_value") then
 		self.increment_time = message.increment_time
 
@@ -98,24 +96,21 @@ function on_message(self, message_id, message, sender)
 		timer_pressed(self, message)
 
 	elseif message_id == hash("pause_play") then
-		if message.paused then
-			set_paused(self, message.paused)
-		else
-			set_paused(self, not self.paused)
-		end 
+		set_paused(self, not self.paused)
 
-	
 	elseif message_id == hash("update_settings") then
 		self.timer_time = message.time
 		self.increment_time = message.increment
 		setup(self)
-		msg.post(".", hash("set_values"), {timer_text = self.timer_time})
+		msg.post(".", hash("set_values"), { timer_text = self.timer_time })
 
 	elseif message_id == hash("reset") then
 		setup(self)
-		msg.post(".", hash("set_values"), {timer_text = self.timer_time})
+		msg.post(".", hash("set_values"), { timer_text = self.timer_time })
 
 	elseif message_id == hash("get_settings") then
-		msg.post(".", hash("provide_settings"), {timer_time = self.timer_time, increment = self.increment_time, default_time = self.default_time, default_increment = self.default_increment})
+		msg.post(".", hash("provide_settings"),
+			{ timer_time = self.timer_time, increment = self.increment_time, default_time = self.default_time,
+				default_increment = self.default_increment })
 	end
 end
