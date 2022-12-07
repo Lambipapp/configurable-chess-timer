@@ -96,7 +96,11 @@ function on_message(self, message_id, message, sender)
 		timer_pressed(self, message)
 
 	elseif message_id == hash("pause_play") then
-		set_paused(self, not self.paused)
+		if message.paused_target then
+			set_paused(self, message.paused_target)
+		else
+			set_paused(self, not self.paused)
+		end
 
 	elseif message_id == hash("update_settings") then
 		self.timer_time = message.time

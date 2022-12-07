@@ -1,15 +1,17 @@
 local function set_pause_play(self, paused, active_player)
 	gui.set_visible(self.play, paused)
 	gui.set_visible(self.pause, not paused)
-	if paused then
-		gui.set_color(self.players_gui[1].background, self.paused_color)
-		gui.set_color(self.players_gui[2].background, self.paused_color)
-	else
-		for k, v in ipairs(self.players_gui) do
-			if active_player == k then
-				gui.set_color(v.background, self.active_timer_color)
-			else
-				gui.set_color(v.background, self.inactive_timer_color)
+	if not self.game_over then
+		if paused then
+			gui.set_color(self.players_gui[1].background, self.paused_color)
+			gui.set_color(self.players_gui[2].background, self.paused_color)
+		else
+			for k, v in ipairs(self.players_gui) do
+				if active_player == k then
+					gui.set_color(v.background, self.active_timer_color)
+				else
+					gui.set_color(v.background, self.inactive_timer_color)
+				end
 			end
 		end
 	end
@@ -64,7 +66,7 @@ function init(self)
 		default_increment = 0,
 		default_time = 0
 	}
-
+	self.game_over = false
 	self.inactive_timer_color = vmath.vector4(51 / 255, 51 / 255, 51 / 255, 1)
 	self.active_timer_color = vmath.vector4(20 / 255, 100 / 255, 20 / 255, 1)
 	self.paused_color = vmath.vector4(100 / 255, 100 / 255, 100 / 255, 1)
@@ -143,6 +145,7 @@ function on_message(self, message_id, message, sender)
 
 	elseif message_id == hash("game_over") then
 		gui.set_color(self.players_gui[message.player].background, self.timer_out_color)
+		self.game_over = true
 
 	elseif message_id == hash("set_values") then
 		set_initial(self, message)
@@ -168,23 +171,28 @@ function on_input(self, action_id, action)
 		if self.view == self.views.game then
 			if gui.pick_node(self.players_gui[1].background, action.x, action.y) then
 				msg.post(".", hash("timer_pressed"), { player = 1 })
+				self.game_over = false
 
 			elseif gui.pick_node(self.players_gui[2].background, action.x, action.y) then
 				msg.post(".", hash("timer_pressed"), { player = 2 })
+				self.game_over = false
 
 			elseif gui.pick_node(self.pause_play, action.x, action.y) then
 				msg.post(".", hash("pause_play"))
+				self.game_over = false
 
 			elseif gui.pick_node(self.reset, action.x, action.y) then
 				msg.post(".", hash("reset"))
+				self.game_over = false
 
 			elseif gui.pick_node(self.settings_btn, action.x, action.y) then
 				change_view(self, self.views.settings)
+				msg.post(".", hash("pause_play"), { paused_target = true })
 			end
 
 		elseif self.view == self.views.settings then
 			if gui.pick_node(self.save_settings, action.x, action.y) then
-				-- save
+				self.game_over = false
 				msg.post(".", hash("update_settings"), { time = self.values.time, increment = self.values.increment })
 				change_view(self, self.views.game)
 
